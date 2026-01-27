@@ -6,7 +6,7 @@ Bundle-Version: 1.0.0.qualifier
 Export-Package: com.github.kolovos.emfcompare.standalone
 Require-Bundle: org.eclipse.emf.compare,
  org.eclipse.emf.ecore.xmi,
- custom.org.eclipse.emf.common,
+ org.eclipse.emf.common,
  com.google.guava
 Automatic-Module-Name: com.github.kolovos.emfcompare.standalone
 Bundle-RequiredExecutionEnvironment: JavaSE-21
