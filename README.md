@@ -1,8 +1,8 @@
-# EMFCompare Standalone Example
+# EMF Compare Standalone Example
 
-A minimal example demonstrating how to run EMF Compare from a headless Java application.
+A minimal example demonstrating how to run [EMF Compare](https://eclipse.dev/emfcompare/) from a headless Java application.
 
-EMF Compare is not published in a normal Maven repository. The repository includes a helper script that downloads the EMF Compare JAR from Eclipse and installs it into your local Maven repository:
+Since EMF Compare is not published in a Maven repository, this repo includes a [helper script](download-emf-compare.sh) that downloads the EMF Compare JAR from its P2 repository and installs it into your local Maven repository:
 
 ```sh
 ./download-emf-compare.sh
