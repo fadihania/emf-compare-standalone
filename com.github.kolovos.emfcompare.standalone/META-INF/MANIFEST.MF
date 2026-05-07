@@ -5,6 +5,7 @@ Bundle-SymbolicName: com.github.kolovos.emfcompare.standalone
 Bundle-Version: 1.0.0.qualifier
 Export-Package: com.github.kolovos.emfcompare.standalone
 Require-Bundle: org.eclipse.emf.compare,
+ org.eclipse.emf.ecore,
  org.eclipse.emf.ecore.xmi,
  org.eclipse.emf.common,
  com.google.guava
