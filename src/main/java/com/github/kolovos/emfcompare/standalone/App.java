@@ -27,10 +27,7 @@ public class App {
 
 	private static final Path OUTPUT_FILE = Path.of("out", "differences.txt");
 	private static final Path COMPARISON_MODEL_FILE = Path.of("out", "comparison-model.xmi");
-	private static final String LEFT_MODEL_URI =
-		"platform:/resource/playground-example/BIMserver/models_2019-11-18_3ab7228.ecore";
-	private static final String RIGHT_MODEL_URI =
-		"platform:/resource/playground-example/BIMserver/models_2026-01-09_1d7577d.ecore";
+	private static final Path PLANTUML_MODEL_FILE = Path.of("out", "comparison-model.puml");
 
 	public static void main(String[] args) throws IOException {
 		ComparePackage.eINSTANCE.eClass();
@@ -39,13 +36,45 @@ public class App {
 		ResourceSet resourceSet1 = new ResourceSetImpl();
 		ResourceSet resourceSet2 = new ResourceSetImpl();
 
-		// Resource left = loadClasspathResource(resourceSet1, "/models/v1.ecore", "memory:/v1.ecore");
-        // Resource right = loadClasspathResource(resourceSet2, "/models/v2.ecore", "memory:/v2.ecore");
+		// Resource right = loadClasspathResource(resourceSet1, "/models/v1.ecore", "memory:/v1.ecore");
+        // Resource left = loadClasspathResource(resourceSet2, "/models/v2.ecore", "memory:/v2.ecore");
 
-        Resource left = loadClasspathResource(resourceSet1, "/models/BIMserver/models_2019-11-18_3ab7228.ecore",
-                LEFT_MODEL_URI);
-        Resource right = loadClasspathResource(resourceSet2, "/models/BIMserver/models_2026-01-09_1d7577d.ecore",
-                RIGHT_MODEL_URI);
+        // BIMserver
+        // String rootPath = "/models/BIMserver/";
+        // Resource right = loadClasspathResource(resourceSet1, rootPath + "models_2011-03-10_53f28be.ecore",
+        //         "platform:/resource" + rootPath + "models_2011-03-10_53f28be.ecore");
+        // Resource right = loadClasspathResource(resourceSet1, rootPath + "models_2019-11-18_3ab7228.ecore",
+        //         "platform:/resource" + rootPath + "models_2019-11-18_3ab7228.ecore");
+        // Resource left = loadClasspathResource(resourceSet2, rootPath + "models_2026-01-09_1d7577d.ecore",
+        //         "platform:/resource" + rootPath + "models_2026-01-09_1d7577d.ecore");
+
+        // SysML-v2-Pilot-Implementation
+        // String rootPath = "/models/SysML-v2-Pilot-Implementation/";
+        // Resource right = loadClasspathResource(resourceSet1, rootPath + "SysML_2018-06-01_fe76e5a.ecore",
+        //         "platform:/resource" + rootPath + "SysML_2018-06-01_fe76e5a.ecore");
+        // Resource left = loadClasspathResource(resourceSet2, rootPath + "SysML_2026-05-27_ffd0ab3.ecore",
+        //         "platform:/resource" + rootPath + "SysML_2026-05-27_ffd0ab3.ecore");
+
+        // eclipse-platform-eclipse.platform.ui
+        // String rootPath = "/models/eclipse-platform-eclipse.platform.ui/";
+        // Resource right = loadClasspathResource(resourceSet1, rootPath + "UIElements_2009-10-14_4f980b6.ecore",
+        //         "platform:/resource" + rootPath + "UIElements_2009-10-14_4f980b6.ecore");
+        // Resource left = loadClasspathResource(resourceSet2, rootPath + "UIElements_2025-10-15_c521dfc.ecore",
+        //         "platform:/resource" + rootPath + "UIElements_2025-10-15_c521dfc.ecore");
+
+        // osate-osate2
+        // String rootPath = "/models/osate-osate2/";
+        // Resource right = loadClasspathResource(resourceSet1, rootPath + "aadl2_2011-04-25_6be208d.ecore",
+        //         "platform:/resource" + rootPath + "aadl2_2011-04-25_6be208d.ecore");
+        // Resource left = loadClasspathResource(resourceSet2, rootPath + "aadl2_2022-09-29_d31992b.ecore",
+        //         "platform:/resource" + rootPath + "aadl2_2022-09-29_d31992b.ecore");
+
+        // Semantic Model Comparison
+        String rootPath = "/models/semantic-model-comparison/";
+        Resource right = loadClasspathResource(resourceSet1, rootPath + "thesis-system1.ecore",
+                "platform:/resource" + rootPath + "thesis-system1.ecore");
+        Resource left = loadClasspathResource(resourceSet2, rootPath + "thesis-system2.ecore",
+                "platform:/resource" + rootPath + "thesis-system2.ecore");
 
 		IComparisonScope scope = new DefaultComparisonScope(left, right, null);
 		Comparison comparison = EMFCompare.builder().build().compare(scope);
@@ -53,6 +82,7 @@ public class App {
 		List<Diff> differences = comparison.getDifferences();
 
 		Files.createDirectories(OUTPUT_FILE.getParent());
+		new PlantUmlComparisonExporter().write(comparison, PLANTUML_MODEL_FILE);
 		saveComparisonModel(comparison);
 		try (PrintStream output = new PrintStream(OUTPUT_FILE.toFile(), StandardCharsets.UTF_8)) {
 			for (Diff diff : differences) {

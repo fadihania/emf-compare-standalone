@@ -1,0 +1,37 @@
+@startuml
+title Example Ecore Model Comparison
+
+left to right direction
+hide empty members
+skinparam classAttributeIconSize 0
+
+class "Customer" as C_Customer <<CHANGED>> #FDF8E2 {
+  id : EString
+  <color:#8F5F00><b>~ displayName:</b> EString ⇒ <b>displayName:</b> localizedString</color>
+  <color:#16803A><b>+ preferredCurrency:</b> Currency</color>
+  <color:#B42318><s><b>- legacyCode:</b> EString</s></color>
+}
+
+class "Invoice" as C_Invoice <<ADDED>> #D5F5E3 {
+  <color:#16803A><b>+ number:</b> EString</color>
+  <color:#16803A><b>+ total:</b> EDouble</color>
+}
+
+class "LegacyRecord" as C_LegacyRecord <<DELETED>> #FADBD8 {
+  <color:#B42318><s><b>- code:</b> EString</s></color>
+}
+
+' Unchanged; included only as an affected reference endpoint
+class "Country" as C_Country
+
+C_Customer -[#16803A]-> "0..*" C_Invoice : <color:#16803A>+ invoices</color>
+C_Customer -[#B42318,dashed]-> "0..1" C_LegacyRecord : <color:#B42318><s>- legacyRecord</s></color>
+C_Customer -[#8F5F00]-> "<color:#8F5F00><s>0..1</s> ⇒ 1" C_Country : <color:#8F5F00>~ country</color>
+
+legend right
+  | Color | Difference |
+  |<#D5F5E3><color:#16803A>+|<#D5F5E3> <color:#16803A>Added in the new model |
+  |<#FADBD8><color:#B42318>-|<#FADBD8> <color:#B42318>Deleted from the new model |
+  |<#FCF3CF><color:#8F5F00>~|<#FCF3CF> <color:#8F5F00>Existing element changed |
+endlegend
+@enduml
