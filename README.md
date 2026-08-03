@@ -14,11 +14,13 @@ After that, the project builds as a normal Maven project:
 mvn verify
 ```
 
-Running `App` writes the raw differences, serialized comparison, and PlantUML class diagram to `out/`:
+Running `App` writes the raw differences, serialized comparison, PlantUML class diagram, and matched
+elements CSV to `out/`:
 
 - `differences.txt`
 - `comparison-model.xmi`
 - `comparison-model.puml`
+- `matching-elements.csv`
 
 The PlantUML source preserves EMF Compare's additions, deletions, changes, and moves. It renders
 additions in green, deletions in red, and changes or moves in yellow.
