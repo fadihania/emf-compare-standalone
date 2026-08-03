@@ -73,8 +73,9 @@ class PlantUmlComparisonExporterTest {
 		String student = classBlock(plantUml, "Student");
 		String user = classBlock(plantUml, "User");
 
-		assertTrue(plantUml.contains("class \"Student\" as C_library_Student <<CHANGED>> #FDF8E2"));
-		assertFalse(plantUml.contains("class \"Student\" as C_library_Student <<ADDED>>"));
+		assertTrue(plantUml.contains("class \"Student:\\n<color:#16803A><b>+ User</b></color>\" "
+			+ "as C_library_Student <<CHANGED>> #FDF8E2"));
+		assertFalse(plantUml.contains("as C_library_Student <<ADDED>>"));
 		assertTrue(plantUml.contains("class \"User\" as C_library_User <<ADDED>> #D5F5E3"));
 		assertTrue(user.contains("<color:#8F5F00><b>~ forename:</b> EString "
 			+ "<i>(Student ⇒ User)</i></color>"));
@@ -85,6 +86,20 @@ class PlantUmlComparisonExporterTest {
 		assertTrue(plantUml.contains("C_library_User <|-[#16803A]-- C_library_Student : "
 			+ "<color:#16803A>+ extends</color>"));
 		assertTrue(plantUml.contains("<color:#8F5F00>Moved"));
+	}
+
+	@Test
+	void canDisableExtensionRelationshipsWhileKeepingSuperclassDetails() {
+		Comparison comparison = movedFeatureComparison();
+		PlantUmlComparisonExporter exporter = new PlantUmlComparisonExporter();
+
+		String withRelationships = exporter.export(comparison, true);
+		String withoutRelationships = exporter.export(comparison, false);
+
+		assertTrue(withRelationships.contains("C_library_User <|-[#16803A]-- C_library_Student"));
+		assertFalse(withoutRelationships.contains("<|-["));
+		assertTrue(withoutRelationships.contains(
+			"class \"Student:\\n<color:#16803A><b>+ User</b></color>\""));
 	}
 
 	@Test
@@ -102,9 +117,11 @@ class PlantUmlComparisonExporterTest {
 	@Test
 	void rendersTheThesisRegressionFromRealEmfCompare() throws IOException {
 		Resource current = loadResource(
-			"/models/semantic-model-comparison/thesis-system2.ecore", "memory:/thesis-current.ecore");
+			"/models/semantic-model-comparison/thesis-system2.ecore",
+			"platform:/resource/models/semantic-model-comparison/thesis-system2.ecore");
 		Resource old = loadResource(
-			"/models/semantic-model-comparison/thesis-system1.ecore", "memory:/thesis-old.ecore");
+			"/models/semantic-model-comparison/thesis-system1.ecore",
+			"platform:/resource/models/semantic-model-comparison/thesis-system1.ecore");
 		Comparison comparison = EMFCompare.builder().build()
 			.compare(new DefaultComparisonScope(current, old, null));
 
@@ -115,9 +132,11 @@ class PlantUmlComparisonExporterTest {
 		String thesis = classBlock(plantUml, "Thesis");
 
 		assertTrue(plantUml.contains("class \"User\" as C_thesis_User <<ADDED>> #D5F5E3"));
-		assertTrue(plantUml.contains("class \"Student\" as C_thesis_Student <<CHANGED>> #FDF8E2"));
-		assertTrue(plantUml.contains(
-			"class \"TeachingStaffMember\" as C_thesis_TeachingStaffMember <<CHANGED>> #FDF8E2"));
+		assertTrue(plantUml.contains("title semantic-model-comparison Ecore Models Comparison"));
+		assertTrue(student.contains("as C_thesis_Student <<CHANGED>> #FDF8E2"));
+		assertTrue(teachingStaff.contains("as C_thesis_TeachingStaffMember <<CHANGED>> #FDF8E2"));
+		assertTrue(student.contains("<color:#16803A><b>+ User</b></color>"));
+		assertTrue(teachingStaff.contains("<color:#16803A><b>+ User</b></color>"));
 		assertFalse(student.contains("forename"));
 		assertFalse(student.contains("surname"));
 		assertTrue(user.contains("⇒ User"));
@@ -267,7 +286,7 @@ class PlantUmlComparisonExporterTest {
 	}
 
 	private static String classBlock(String plantUml, String className) {
-		int start = plantUml.indexOf("class \"" + className + "\"");
+		int start = plantUml.indexOf("class \"" + className);
 		if (start < 0) {
 			return "";
 		}

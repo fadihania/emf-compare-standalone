@@ -43,17 +43,25 @@ public final class PlantUmlComparisonExporter {
 	private static final String CHANGED_BACKGROUND = "#FDF8E2";
 
 	public String export(Comparison comparison) {
+		return export(comparison, true);
+	}
+
+	public String export(Comparison comparison, boolean includeExtensionRelationships) {
 		Objects.requireNonNull(comparison, "comparison");
-		return new Diagram(comparison).render();
+		return new Diagram(comparison, includeExtensionRelationships).render();
 	}
 
 	public void write(Comparison comparison, Path output) throws IOException {
+		write(comparison, output, true);
+	}
+
+	public void write(Comparison comparison, Path output, boolean includeExtensionRelationships) throws IOException {
 		Objects.requireNonNull(output, "output");
 		Path parent = output.toAbsolutePath().getParent();
 		if (parent != null) {
 			Files.createDirectories(parent);
 		}
-		Files.writeString(output, export(comparison), StandardCharsets.UTF_8);
+		Files.writeString(output, export(comparison, includeExtensionRelationships), StandardCharsets.UTF_8);
 	}
 
 	private enum Kind {
@@ -135,6 +143,7 @@ public final class PlantUmlComparisonExporter {
 
 	private static final class Diagram {
 		private final Comparison comparison;
+		private final boolean includeExtensionRelationships;
 		private final Map<Object, ClassView> classesByKey = new IdentityHashMap<>();
 		private final Map<EClass, ClassView> classesByObject = new IdentityHashMap<>();
 		private final Map<Object, FeatureView> featuresByKey = new IdentityHashMap<>();
@@ -143,8 +152,9 @@ public final class PlantUmlComparisonExporter {
 		private final Set<FeatureView> features = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
 		private final List<InheritanceDiff> inheritanceDiffs = new ArrayList<>();
 
-		private Diagram(Comparison comparison) {
+		private Diagram(Comparison comparison, boolean includeExtensionRelationships) {
 			this.comparison = comparison;
+			this.includeExtensionRelationships = includeExtensionRelationships;
 			for (Match match : comparison.getMatches()) {
 				registerMatches(match);
 			}
@@ -330,9 +340,11 @@ public final class PlantUmlComparisonExporter {
 					visible.add(classFor(reference.getEReferenceType()));
 				}
 			}
-			for (InheritanceDiff inheritance : inheritanceDiffs) {
-				visible.add(inheritance.subclass());
-				visible.add(inheritance.superclass());
+			if (includeExtensionRelationships) {
+				for (InheritanceDiff inheritance : inheritanceDiffs) {
+					visible.add(inheritance.subclass());
+					visible.add(inheritance.superclass());
+				}
 			}
 
 			List<ClassView> orderedClasses = visible.stream()
@@ -342,7 +354,8 @@ public final class PlantUmlComparisonExporter {
 
 			StringBuilder output = new StringBuilder();
 			output.append("@startuml\n")
-				.append("title Ecore Model Comparison\n\n")
+				.append("title ").append(escapeMarkup(diagramName(comparison)))
+				.append(" Ecore Models Comparison\n\n")
 				.append("left to right direction\n")
 				.append("hide empty members\n")
 				.append("skinparam classAttributeIconSize 0\n\n");
@@ -353,11 +366,13 @@ public final class PlantUmlComparisonExporter {
 			for (FeatureView association : associations) {
 				renderAssociation(output, association);
 			}
-			for (InheritanceDiff inheritance : inheritanceDiffs.stream()
-					.sorted(Comparator.comparing(PlantUmlComparisonExporter::inheritanceSortKey)).toList()) {
-				renderInheritance(output, inheritance);
+			if (includeExtensionRelationships) {
+				for (InheritanceDiff inheritance : inheritanceDiffs.stream()
+						.sorted(Comparator.comparing(PlantUmlComparisonExporter::inheritanceSortKey)).toList()) {
+					renderInheritance(output, inheritance);
+				}
 			}
-			if (!associations.isEmpty() || !inheritanceDiffs.isEmpty()) {
+			if (!associations.isEmpty() || (includeExtensionRelationships && !inheritanceDiffs.isEmpty())) {
 				output.append('\n');
 			}
 			renderLegend(output);
@@ -379,7 +394,7 @@ public final class PlantUmlComparisonExporter {
 			if (eClass == null) {
 				return;
 			}
-			output.append("class \"").append(escapeQuoted(nameOf(eClass))).append("\" as ")
+			output.append("class \"").append(classLabel(view)).append("\" as ")
 				.append(view.alias);
 			switch (view.presentationKind()) {
 				case ADD -> output.append(" <<ADDED>> ").append(ADDED_BACKGROUND);
@@ -394,6 +409,41 @@ public final class PlantUmlComparisonExporter {
 				.sorted(Comparator.comparing(PlantUmlComparisonExporter::featureSortKey))
 				.forEach(feature -> output.append("  ").append(renderAttribute(feature)).append('\n'));
 			output.append("}\n\n");
+		}
+
+		private String classLabel(ClassView view) {
+			EClass displayed = view.displayed();
+			Map<ClassView, Kind> diffKinds = new IdentityHashMap<>();
+			inheritanceDiffs.stream()
+				.filter(diff -> diff.subclass() == view)
+				.forEach(diff -> diffKinds.put(diff.superclass(), diff.kind()));
+
+			Set<ClassView> superclasses = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+			if (displayed != null) {
+				for (EClass superclass : displayed.getESuperTypes()) {
+					superclasses.add(classFor(superclass));
+				}
+			}
+			superclasses.addAll(diffKinds.keySet());
+			if (superclasses.isEmpty()) {
+				return escapeQuoted(nameOf(displayed));
+			}
+
+			String details = superclasses.stream()
+				.sorted(Comparator.comparing(PlantUmlComparisonExporter::classSortKey))
+				.map(superclass -> renderSuperclassName(superclass, diffKinds.getOrDefault(superclass, Kind.NONE)))
+				.collect(Collectors.joining(", "));
+			return escapeQuoted(nameOf(displayed)) + ":\\n" + details;
+		}
+
+		private String renderSuperclassName(ClassView superclass, Kind kind) {
+			String name = escapeMarkup(escapeQuoted(className(superclass)));
+			return switch (kind) {
+				case ADD -> "<color:" + ADDED_TEXT + "><b>+ " + name + "</b></color>";
+				case DELETE -> "<color:" + DELETED_TEXT + "><s><b>- " + name + "</b></s></color>";
+				case CHANGE, MOVE -> "<color:" + CHANGED_TEXT + "><b>~ " + name + "</b></color>";
+				case NONE -> name;
+			};
 		}
 
 		private List<FeatureView> attributesFor(ClassView owner) {
@@ -705,6 +755,39 @@ public final class PlantUmlComparisonExporter {
 		}
 		names.add(nameOf(eClass));
 		return String.join(".", names);
+	}
+
+	private static String diagramName(Comparison comparison) {
+		for (Match match : comparison.getMatches()) {
+			String name = containingFolderName(match);
+			if (name != null) {
+				return name;
+			}
+		}
+		return "Ecore";
+	}
+
+	private static String containingFolderName(Match match) {
+		EObject[] objects = {match.getLeft(), match.getRight(), match.getOrigin()};
+		for (EObject object : objects) {
+			if (object == null || object.eResource() == null || object.eResource().getURI() == null) {
+				continue;
+			}
+			org.eclipse.emf.common.util.URI uri = object.eResource().getURI();
+			if (uri.segmentCount() > 1) {
+				String folder = uri.segment(uri.segmentCount() - 2);
+				if (folder != null && !folder.isBlank()) {
+					return folder;
+				}
+			}
+		}
+		for (Match submatch : match.getSubmatches()) {
+			String name = containingFolderName(submatch);
+			if (name != null) {
+				return name;
+			}
+		}
+		return null;
 	}
 
 	private static String nameOf(Object object) {

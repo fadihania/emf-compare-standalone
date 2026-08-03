@@ -28,6 +28,7 @@ public class App {
 	private static final Path OUTPUT_FILE = Path.of("out", "differences.txt");
 	private static final Path COMPARISON_MODEL_FILE = Path.of("out", "comparison-model.xmi");
 	private static final Path PLANTUML_MODEL_FILE = Path.of("out", "comparison-model.puml");
+	private static final boolean INCLUDE_EXTENSION_RELATIONSHIPS = false;
 
 	public static void main(String[] args) throws IOException {
 		ComparePackage.eINSTANCE.eClass();
@@ -82,7 +83,8 @@ public class App {
 		List<Diff> differences = comparison.getDifferences();
 
 		Files.createDirectories(OUTPUT_FILE.getParent());
-		new PlantUmlComparisonExporter().write(comparison, PLANTUML_MODEL_FILE);
+		new PlantUmlComparisonExporter().write(
+			comparison, PLANTUML_MODEL_FILE, INCLUDE_EXTENSION_RELATIONSHIPS);
 		saveComparisonModel(comparison);
 		try (PrintStream output = new PrintStream(OUTPUT_FILE.toFile(), StandardCharsets.UTF_8)) {
 			for (Diff diff : differences) {
