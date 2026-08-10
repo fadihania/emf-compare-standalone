@@ -25,10 +25,7 @@ import org.eclipse.emf.ecore.xmi.impl.XMIResourceFactoryImpl;
 
 public class App {
 
-	private static final Path OUTPUT_FILE = Path.of("out", "differences.txt");
-	private static final Path COMPARISON_MODEL_FILE = Path.of("out", "comparison-model.xmi");
-	private static final Path PLANTUML_MODEL_FILE = Path.of("out", "comparison-model.puml");
-	private static final Path MATCHING_ELEMENTS_FILE = Path.of("out", "matching-elements.csv");
+	private static final Path OUTPUT_DIRECTORY = Path.of("out");
 	private static final boolean INCLUDE_EXTENSION_RELATIONSHIPS = false;
 
 	public static void main(String[] args) throws IOException {
@@ -38,8 +35,8 @@ public class App {
 		ResourceSet resourceSet1 = new ResourceSetImpl();
 		ResourceSet resourceSet2 = new ResourceSetImpl();
 
-		// Resource right = loadClasspathResource(resourceSet1, "/models/v1.ecore", "memory:/v1.ecore");
-        // Resource left = loadClasspathResource(resourceSet2, "/models/v2.ecore", "memory:/v2.ecore");
+		// Resource right = loadClasspathResource(resourceSet1, "/models/library-example/model_v1.ecore", "memory:/v1.ecore");
+        // Resource left = loadClasspathResource(resourceSet2, "/models/library-example/model_v2.ecore", "memory:/v2.ecore");
 
         // BIMserver
         // String rootPath = "/models/BIMserver/";
@@ -82,13 +79,14 @@ public class App {
 		Comparison comparison = EMFCompare.builder().build().compare(scope);
 
 		List<Diff> differences = comparison.getDifferences();
+		ComparisonOutputNamer.OutputPaths outputPaths =
+			ComparisonOutputNamer.create(left, right, OUTPUT_DIRECTORY);
 
-		Files.createDirectories(OUTPUT_FILE.getParent());
 		new PlantUmlComparisonExporter().write(
-			comparison, PLANTUML_MODEL_FILE, INCLUDE_EXTENSION_RELATIONSHIPS);
-		new MatchedElementsCsvExporter().write(comparison, MATCHING_ELEMENTS_FILE);
-		saveComparisonModel(comparison);
-		try (PrintStream output = new PrintStream(OUTPUT_FILE.toFile(), StandardCharsets.UTF_8)) {
+			comparison, outputPaths.plantUml(), INCLUDE_EXTENSION_RELATIONSHIPS);
+		new MatchedElementsCsvExporter().write(comparison, outputPaths.matchingElements());
+		saveComparisonModel(comparison, outputPaths.comparisonModel());
+		try (PrintStream output = new PrintStream(outputPaths.differences().toFile(), StandardCharsets.UTF_8)) {
 			for (Diff diff : differences) {
 				// output.println(diff.getKind());
 				output.println(diff);
@@ -110,15 +108,15 @@ public class App {
 		return resource;
 	}
 
-	private static void saveComparisonModel(Comparison comparison) throws IOException {
-		Files.createDirectories(COMPARISON_MODEL_FILE.getParent());
+	private static void saveComparisonModel(Comparison comparison, Path output) throws IOException {
+		Files.createDirectories(output.toAbsolutePath().getParent());
 
 		ResourceSet resourceSet = new ResourceSetImpl();
 		resourceSet.getPackageRegistry().put(ComparePackage.eNS_URI, ComparePackage.eINSTANCE);
 		resourceSet.getResourceFactoryRegistry().getExtensionToFactoryMap().put("xmi", new XMIResourceFactoryImpl());
 
 		Resource resource = resourceSet.createResource(
-			URI.createFileURI(COMPARISON_MODEL_FILE.toAbsolutePath().toString()));
+			URI.createFileURI(output.toAbsolutePath().toString()));
 		resource.getContents().add(comparison);
 		resource.save(Map.of(XMLResource.OPTION_ENCODING, "ASCII"));
 	}

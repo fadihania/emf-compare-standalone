@@ -15,7 +15,12 @@ mvn verify
 ```
 
 Running `App` writes the raw differences, serialized comparison, PlantUML class diagram, and matched
-elements CSV to `out/`:
+elements CSV to `out/<folder>/`. Output names use the model name, left version, right version, and a
+collision counter. Differences include `diff` and matching CSV files include `matchings`, for example:
+
+`out/osate-osate2/aadl2__2022-09-29_d31992b__2011-04-25_6be208d__1.xmi`
+
+`out/osate-osate2/aadl2__2022-09-29_d31992b__2011-04-25_6be208d__diff__1.txt`
 
 - `differences.txt`
 - `comparison-model.xmi`
