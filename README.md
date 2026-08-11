@@ -15,7 +15,7 @@ mvn verify
 ```
 
 Running `App` writes the raw differences, serialized comparison, PlantUML class diagram, and matched
-elements CSV to `out/<folder>/`. Output names use the model name, left version, right version, and a
+elements CSV and SVG diagram to `out/<folder>/`. Output names use the model name, left version, right version, and a
 collision counter. Differences include `diff` and matching CSV files include `matchings`, for example:
 
 `out/osate-osate2/aadl2__2022-09-29_d31992b__2011-04-25_6be208d__1.xmi`
@@ -25,6 +25,7 @@ collision counter. Differences include `diff` and matching CSV files include `ma
 - `differences.txt`
 - `comparison-model.xmi`
 - `comparison-model.puml`
+- `<model>__<left-version>__<right-version>__<count>.svg`
 - `matching-elements.csv`
 
 The PlantUML source preserves EMF Compare's additions, deletions, changes, and moves. It renders

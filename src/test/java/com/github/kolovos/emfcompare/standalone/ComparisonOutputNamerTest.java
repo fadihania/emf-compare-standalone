@@ -25,6 +25,8 @@ class ComparisonOutputNamerTest {
 			paths.comparisonModel().getFileName().toString());
 		assertEquals("aadl2__2022-09-29_d31992b__2011-04-25_6be208d__1.puml",
 			paths.plantUml().getFileName().toString());
+		assertEquals("aadl2__2022-09-29_d31992b__2011-04-25_6be208d__1.svg",
+			paths.svg().getFileName().toString());
 		assertEquals("aadl2__2022-09-29_d31992b__2011-04-25_6be208d__diff__1.txt",
 			paths.differences().getFileName().toString());
 		assertEquals("aadl2__2022-09-29_d31992b__2011-04-25_6be208d__matchings__1.csv",
@@ -38,6 +40,7 @@ class ComparisonOutputNamerTest {
 		Path folder = output.resolve("library-example");
 		Files.createDirectories(folder);
 		Files.createFile(folder.resolve("model__v2__v1__1.xmi"));
+		Files.createFile(folder.resolve("model__v2__v1__2.svg"));
 		Files.createFile(folder.resolve("model__v2__v1__diff__3.txt"));
 
 		ComparisonOutputNamer.OutputPaths paths = ComparisonOutputNamer.create(left, right, output);

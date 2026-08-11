@@ -358,7 +358,8 @@ public final class PlantUmlComparisonExporter {
 				.append(" Ecore Models Comparison\n\n")
 				.append("left to right direction\n")
 				.append("hide empty members\n")
-				.append("skinparam classAttributeIconSize 0\n\n");
+				.append("skinparam classAttributeIconSize 0\n")
+				.append("skinparam titleFontSize 26\n\n");
 
 			for (ClassView view : orderedClasses) {
 				renderClass(output, view);

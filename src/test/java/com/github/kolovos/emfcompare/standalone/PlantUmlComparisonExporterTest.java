@@ -133,6 +133,7 @@ class PlantUmlComparisonExporterTest {
 
 		assertTrue(plantUml.contains("class \"User\" as C_thesis_User <<ADDED>> #D5F5E3"));
 		assertTrue(plantUml.contains("title semantic-model-comparison Ecore Models Comparison"));
+		assertTrue(plantUml.contains("skinparam titleFontSize 26"));
 		assertTrue(student.contains("as C_thesis_Student <<CHANGED>> #FDF8E2"));
 		assertTrue(teachingStaff.contains("as C_thesis_TeachingStaffMember <<CHANGED>> #FDF8E2"));
 		assertTrue(student.contains("<color:#16803A><b>+ User</b></color>"));

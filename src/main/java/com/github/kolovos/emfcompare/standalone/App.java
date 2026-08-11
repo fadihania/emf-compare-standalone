@@ -84,6 +84,7 @@ public class App {
 
 		new PlantUmlComparisonExporter().write(
 			comparison, outputPaths.plantUml(), INCLUDE_EXTENSION_RELATIONSHIPS);
+		new PlantUmlSvgExporter().write(outputPaths.plantUml(), outputPaths.svg());
 		new MatchedElementsCsvExporter().write(comparison, outputPaths.matchingElements());
 		saveComparisonModel(comparison, outputPaths.comparisonModel());
 		try (PrintStream output = new PrintStream(outputPaths.differences().toFile(), StandardCharsets.UTF_8)) {

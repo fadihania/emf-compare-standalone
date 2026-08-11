@@ -5,7 +5,7 @@ left to right direction
 hide empty members
 skinparam classAttributeIconSize 0
 
-class "Customer" as C_Customer <<CHANGED>> #FDF8E2 {
+class "Customer:\n<color:#16803A><b>+ User</b></color>" as C_Customer <<CHANGED>> #FDF8E2 {
   id : EString
   <color:#8F5F00><b>~ displayName:</b> EString ⇒ <b>displayName:</b> localizedString</color>
   <color:#16803A><b>+ preferredCurrency:</b> Currency</color>

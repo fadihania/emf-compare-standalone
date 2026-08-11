@@ -45,6 +45,7 @@ final class ComparisonOutputNamer {
 		return new OutputPaths(
 			modelOutputDirectory.resolve(numberedBase + ".xmi"),
 			modelOutputDirectory.resolve(numberedBase + ".puml"),
+			modelOutputDirectory.resolve(numberedBase + ".svg"),
 			modelOutputDirectory.resolve(fileBase + "__diff__" + count + ".txt"),
 			modelOutputDirectory.resolve(fileBase + "__matchings__" + count + ".csv"));
 	}
@@ -122,7 +123,7 @@ final class ComparisonOutputNamer {
 		return sanitized.isBlank() ? DEFAULT_MODEL_NAME : sanitized;
 	}
 
-	record OutputPaths(Path comparisonModel, Path plantUml, Path differences, Path matchingElements) {
+	record OutputPaths(Path comparisonModel, Path plantUml, Path svg, Path differences, Path matchingElements) {
 	}
 
 	private record ModelName(String base, String version) {
