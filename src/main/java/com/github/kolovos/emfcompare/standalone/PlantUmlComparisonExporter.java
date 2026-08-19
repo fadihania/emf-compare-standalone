@@ -42,6 +42,14 @@ public final class PlantUmlComparisonExporter {
 	private static final String DELETED_BACKGROUND = "#FADBD8";
 	private static final String CHANGED_BACKGROUND = "#FDF8E2";
 
+	/** PlantUML source for one focused, affected-class diagram. */
+	public record ChangeDiagram(String fileName, String source) {
+	}
+
+	/** Source for the linked main diagram and all of its focused diagrams. */
+	public record ChangeDiagramSet(String mainSource, List<ChangeDiagram> diagrams) {
+	}
+
 	public String export(Comparison comparison) {
 		return export(comparison, true);
 	}
@@ -62,6 +70,11 @@ public final class PlantUmlComparisonExporter {
 			Files.createDirectories(parent);
 		}
 		Files.writeString(output, export(comparison, includeExtensionRelationships), StandardCharsets.UTF_8);
+	}
+
+	public ChangeDiagramSet exportChangeDiagrams(Comparison comparison) {
+		Objects.requireNonNull(comparison, "comparison");
+		return new Diagram(comparison, true).renderChangeDiagrams();
 	}
 
 	private enum Kind {
@@ -140,6 +153,9 @@ public final class PlantUmlComparisonExporter {
 	}
 
 	private record InheritanceDiff(Diff diff, ClassView subclass, ClassView superclass, Kind kind) {
+	}
+
+	private record InheritanceEdge(ClassView subclass, ClassView superclass, Kind kind) {
 	}
 
 	private static final class Diagram {
@@ -387,6 +403,199 @@ public final class PlantUmlComparisonExporter {
 			return output.toString();
 		}
 
+		private ChangeDiagramSet renderChangeDiagrams() {
+			List<ClassView> focalClasses = classes.stream()
+				.filter(view -> view.affected || view.identityKind != Kind.NONE)
+				.sorted(Comparator.comparing(PlantUmlComparisonExporter::classSortKey))
+				.toList();
+			Map<ClassView, String> filenames = changeDiagramFilenames(focalClasses);
+			Set<ClassView> mainVisible = visibleClasses(associations(), true);
+			String mainSource = renderChangeDocument(
+				diagramName(comparison) + " → Modified Elements", mainVisible, filenames, null);
+			List<ChangeDiagram> diagrams = new ArrayList<>();
+			for (ClassView focal : focalClasses) {
+				String title = diagramName(comparison) + " → " + nameOf(focal.displayed()) + " ("
+					+ changeType(focal.presentationKind()) + ")";
+				diagrams.add(new ChangeDiagram(filenames.get(focal),
+					renderChangeDocument(title, focusedVisibleClasses(focal), Map.of(), focal)));
+			}
+			return new ChangeDiagramSet(mainSource, List.copyOf(diagrams));
+		}
+
+		private List<FeatureView> associations() {
+			return features.stream()
+				.filter(feature -> feature.displayed() instanceof EReference)
+				.filter(feature -> feature.presentationKind() != Kind.NONE)
+				.sorted(Comparator.comparing(PlantUmlComparisonExporter::featureSortKey))
+				.toList();
+		}
+
+		private Set<ClassView> visibleClasses(List<FeatureView> associations, boolean includeInheritance) {
+			Set<ClassView> visible = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+			classes.stream().filter(view -> view.affected || view.identityKind != Kind.NONE).forEach(visible::add);
+			for (FeatureView association : associations) {
+				addAssociationEndpoints(visible, association);
+			}
+			if (includeInheritance) {
+				for (InheritanceDiff inheritance : inheritanceDiffs) {
+					visible.add(inheritance.subclass());
+					visible.add(inheritance.superclass());
+				}
+			}
+			return visible;
+		}
+
+		private Set<ClassView> focusedVisibleClasses(ClassView focal) {
+			Set<ClassView> visible = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+			visible.add(focal);
+			for (FeatureView association : associations()) {
+				ClassView source = association.renderOwner();
+				ClassView target = referenceTarget(association);
+				if (source == focal || target == focal) {
+					addAssociationEndpoints(visible, association);
+				}
+			}
+			for (InheritanceDiff inheritance : inheritanceDiffs) {
+				if (inheritance.subclass() == focal || inheritance.superclass() == focal) {
+					visible.add(inheritance.subclass());
+					visible.add(inheritance.superclass());
+				}
+			}
+			addSuperclassAncestors(visible);
+			return visible;
+		}
+
+		private void addAssociationEndpoints(Set<ClassView> visible, FeatureView association) {
+			ClassView source = association.renderOwner();
+			ClassView target = referenceTarget(association);
+			if (source != null) {
+				visible.add(source);
+			}
+			if (target != null) {
+				visible.add(target);
+			}
+		}
+
+		private ClassView referenceTarget(FeatureView association) {
+			if (!(association.displayed() instanceof EReference reference) || reference.getEReferenceType() == null) {
+				return null;
+			}
+			return classFor(reference.getEReferenceType());
+		}
+
+		private void addSuperclassAncestors(Set<ClassView> visible) {
+			boolean changed;
+			do {
+				changed = false;
+				for (ClassView view : new ArrayList<>(visible)) {
+					EClass displayed = view.displayed();
+					if (displayed == null) {
+						continue;
+					}
+					for (EClass superclass : displayed.getESuperTypes()) {
+						changed |= visible.add(classFor(superclass));
+					}
+				}
+			} while (changed);
+		}
+
+		private Map<ClassView, String> changeDiagramFilenames(List<ClassView> focalClasses) {
+			Map<String, List<ClassView>> bySimpleName = new LinkedHashMap<>();
+			for (ClassView view : focalClasses) {
+				bySimpleName.computeIfAbsent(sanitizeFilename(nameOf(view.displayed())), ignored -> new ArrayList<>()).add(view);
+			}
+			Map<ClassView, String> result = new IdentityHashMap<>();
+			Set<String> used = new LinkedHashSet<>();
+			for (ClassView view : focalClasses) {
+				String simple = sanitizeFilename(nameOf(view.displayed()));
+				String stem = bySimpleName.get(simple).size() == 1 && !"main".equalsIgnoreCase(simple)
+					? simple : sanitizeFilename(qualifiedName(view.displayed()).replace('.', '_'));
+				String candidate = stem;
+				int suffix = 2;
+				while (!used.add(candidate.toLowerCase())) {
+					candidate = stem + "__" + suffix++;
+				}
+				result.put(view, candidate + ".puml");
+			}
+			return result;
+		}
+
+		private String renderChangeDocument(String title, Set<ClassView> visible, Map<ClassView, String> links,
+				ClassView focal) {
+			List<ClassView> orderedClasses = visible.stream()
+				.sorted(Comparator.comparing(PlantUmlComparisonExporter::classSortKey))
+				.toList();
+			assignAliases(orderedClasses);
+			List<FeatureView> associations = associations().stream()
+				.filter(association -> visible.contains(association.renderOwner()))
+				.filter(association -> visible.contains(referenceTarget(association)))
+				.toList();
+			List<InheritanceEdge> inheritance = inheritanceEdges(visible);
+
+			StringBuilder output = new StringBuilder();
+			output.append("@startuml\n")
+				.append("title ").append(escapeMarkup(title)).append("\n\n")
+				.append("top to bottom direction\n")
+				.append("hide empty members\n");
+			if (focal != null) {
+				output.append("hide <<__FOCUS__>> stereotype\n")
+					.append("skinparam classBorderColor<<__FOCUS__>> ").append(CHANGED_TEXT).append("\n")
+					.append("skinparam classBorderThickness<<__FOCUS__>> 3\n");
+			}
+			output.append("skinparam classAttributeIconSize 0\n")
+				.append("skinparam titleFontSize 26\n\n");
+			for (ClassView view : orderedClasses) {
+				renderClass(output, view, view == focal);
+				String filename = links.get(view);
+				if (filename != null) {
+					output.append("url of ").append(view.alias).append(" is [[")
+						.append(filename.replaceAll("\\.puml$", ".svg")).append("]]\n\n");
+				}
+			}
+			for (FeatureView association : associations) {
+				renderAssociation(output, association);
+			}
+			for (InheritanceEdge edge : inheritance) {
+				renderInheritance(output, edge);
+			}
+			if (!associations.isEmpty() || !inheritance.isEmpty()) {
+				output.append('\n');
+			}
+			renderLegend(output);
+			output.append("@enduml\n");
+			return output.toString();
+		}
+
+		private List<InheritanceEdge> inheritanceEdges(Set<ClassView> visible) {
+			Map<String, InheritanceEdge> edges = new LinkedHashMap<>();
+			for (InheritanceDiff diff : inheritanceDiffs) {
+				if (visible.contains(diff.subclass()) && visible.contains(diff.superclass())) {
+					edges.put(inheritanceEdgeKey(diff.subclass(), diff.superclass()),
+						new InheritanceEdge(diff.subclass(), diff.superclass(), diff.kind()));
+				}
+			}
+			for (ClassView subclass : visible) {
+				EClass displayed = subclass.displayed();
+				if (displayed == null) {
+					continue;
+				}
+				for (EClass supertype : displayed.getESuperTypes()) {
+					ClassView superclass = classFor(supertype);
+					if (visible.contains(superclass)) {
+						edges.putIfAbsent(inheritanceEdgeKey(subclass, superclass),
+							new InheritanceEdge(subclass, superclass, Kind.NONE));
+					}
+				}
+			}
+			return edges.values().stream()
+				.sorted(Comparator.comparing(edge -> inheritanceEdgeKey(edge.subclass(), edge.superclass())))
+				.toList();
+		}
+
+		private String inheritanceEdgeKey(ClassView subclass, ClassView superclass) {
+			return classSortKey(superclass) + "->" + classSortKey(subclass);
+		}
+
 		private void assignAliases(List<ClassView> ordered) {
 			Map<String, Integer> occurrences = new LinkedHashMap<>();
 			for (ClassView view : ordered) {
@@ -397,12 +606,19 @@ public final class PlantUmlComparisonExporter {
 		}
 
 		private void renderClass(StringBuilder output, ClassView view) {
+			renderClass(output, view, false);
+		}
+
+		private void renderClass(StringBuilder output, ClassView view, boolean focused) {
 			EClass eClass = view.displayed();
 			if (eClass == null) {
 				return;
 			}
 			output.append("class \"").append(classLabel(view)).append("\" as ")
 				.append(view.alias);
+			if (focused) {
+				output.append(" <<__FOCUS__>>");
+			}
 			switch (view.presentationKind()) {
 				case ADD -> output.append(" <<ADDED>> ").append(ADDED_BACKGROUND);
 				case DELETE -> output.append(" <<DELETED>> ").append(DELETED_BACKGROUND);
@@ -590,6 +806,11 @@ public final class PlantUmlComparisonExporter {
 		}
 
 		private void renderInheritance(StringBuilder output, InheritanceDiff inheritance) {
+			renderInheritance(output, new InheritanceEdge(inheritance.subclass(), inheritance.superclass(),
+				inheritance.kind()));
+		}
+
+		private void renderInheritance(StringBuilder output, InheritanceEdge inheritance) {
 			if (inheritance.superclass().alias == null || inheritance.subclass().alias == null) {
 				return;
 			}
@@ -834,6 +1055,20 @@ public final class PlantUmlComparisonExporter {
 	private static String sanitizeIdentifier(String value) {
 		String sanitized = value.replaceAll("[^A-Za-z0-9_]", "_");
 		return sanitized.isEmpty() ? "unnamed" : sanitized;
+	}
+
+	private static String sanitizeFilename(String value) {
+		String sanitized = value.replaceAll("[^A-Za-z0-9._-]", "_");
+		return sanitized.isBlank() ? "unnamed" : sanitized;
+	}
+
+	private static String changeType(Kind kind) {
+		return switch (kind) {
+			case ADD -> "added";
+			case DELETE -> "deleted";
+			case MOVE -> "moved";
+			case CHANGE, NONE -> "changed";
+		};
 	}
 
 	private static String escapeQuoted(String value) {

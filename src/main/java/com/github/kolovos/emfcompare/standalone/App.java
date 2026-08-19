@@ -27,6 +27,7 @@ public class App {
 
 	private static final Path OUTPUT_DIRECTORY = Path.of("out");
 	private static final boolean INCLUDE_EXTENSION_RELATIONSHIPS = false;
+	private static final boolean GENERATE_PER_CLASS_CHANGE_DIAGRAMS = false;
 
 	public static void main(String[] args) throws IOException {
 		ComparePackage.eINSTANCE.eClass();
@@ -85,6 +86,9 @@ public class App {
 		new PlantUmlComparisonExporter().write(
 			comparison, outputPaths.plantUml(), INCLUDE_EXTENSION_RELATIONSHIPS);
 		new PlantUmlSvgExporter().write(outputPaths.plantUml(), outputPaths.svg());
+		if (GENERATE_PER_CLASS_CHANGE_DIAGRAMS) {
+			new PlantUmlChangeDiagramExporter().write(comparison, outputPaths.plantUml().getParent());
+		}
 		new MatchedElementsCsvExporter().write(comparison, outputPaths.matchingElements());
 		saveComparisonModel(comparison, outputPaths.comparisonModel());
 		try (PrintStream output = new PrintStream(outputPaths.differences().toFile(), StandardCharsets.UTF_8)) {

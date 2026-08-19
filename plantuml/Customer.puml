@@ -1,0 +1,21 @@
+@startuml
+title library → Customer (changed)
+top to bottom direction
+hide empty members
+hide <<__FOCUS__>> stereotype
+skinparam classAttributeIconSize 0
+skinparam titleFontSize 26
+skinparam classBorderColor<<__FOCUS__>> #8F5F00
+skinparam classBorderThickness<<__FOCUS__>> 3
+
+class "Customer" as C_Customer <<CHANGED>> <<__FOCUS__>> #FDF8E2 {
+  id : EString
+  <color:#16803A><b>+ preferredCurrency:</b> Currency</color>
+}
+
+class "Invoice" as C_Invoice <<ADDED>> #D5F5E3 {
+  <color:#16803A><b>+ number:</b> EString</color>
+}
+
+C_Customer -[#16803A]-> "0..*" C_Invoice : <color:#16803A>+ invoices</color>
+@enduml

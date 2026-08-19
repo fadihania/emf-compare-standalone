@@ -1,0 +1,18 @@
+@startuml
+title library → Modified Elements
+top to bottom direction
+hide empty members
+skinparam classAttributeIconSize 0
+
+class "Customer" as C_Customer <<CHANGED>> #FDF8E2 {
+  <color:#16803A><b>+ preferredCurrency:</b> Currency</color>
+}
+url of C_Customer is [[Customer.svg]]
+
+class "Invoice" as C_Invoice <<ADDED>> #D5F5E3 {
+  <color:#16803A><b>+ number:</b> EString</color>
+}
+url of C_Invoice is [[Invoice.svg]]
+
+C_Customer -[#16803A]-> "0..*" C_Invoice : <color:#16803A>+ invoices</color>
+@enduml

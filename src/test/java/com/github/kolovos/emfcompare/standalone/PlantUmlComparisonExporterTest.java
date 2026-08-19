@@ -8,6 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.compare.AttributeChange;
@@ -136,6 +139,78 @@ class PlantUmlComparisonExporterTest {
 	}
 
 	@Test
+	void exportsLinkedFocusedClassDiagrams() {
+		PlantUmlComparisonExporter.ChangeDiagramSet diagrams =
+			new PlantUmlComparisonExporter().exportChangeDiagrams(customerComparison());
+		Map<String, String> sources = diagrams.diagrams().stream()
+			.collect(java.util.stream.Collectors.toMap(PlantUmlComparisonExporter.ChangeDiagram::fileName,
+				PlantUmlComparisonExporter.ChangeDiagram::source));
+
+		assertTrue(diagrams.mainSource().contains("title Ecore → Modified Elements"));
+		assertTrue(diagrams.mainSource().contains("url of C_library_Customer is [[Customer.svg]]"));
+		assertTrue(diagrams.mainSource().contains("url of C_library_Invoice is [[Invoice.svg]]"));
+		assertFalse(diagrams.mainSource().contains("url of C_library_Country"));
+		assertTrue(sources.containsKey("Customer.puml"));
+		assertTrue(sources.containsKey("Invoice.puml"));
+		assertTrue(sources.containsKey("LegacyRecord.puml"));
+		assertFalse(sources.containsKey("Country.puml"));
+
+		String customer = sources.get("Customer.puml");
+		assertTrue(customer.contains("title Ecore → Customer (changed)"));
+		assertTrue(customer.contains("top to bottom direction"));
+		assertTrue(customer.contains("hide <<__FOCUS__>> stereotype"));
+		assertTrue(customer.contains("skinparam classBorderThickness<<__FOCUS__>> 3"));
+		assertTrue(customer.contains("class \"Customer\" as C_library_Customer <<__FOCUS__>> <<CHANGED>> #FDF8E2"));
+		assertTrue(customer.contains("class \"Invoice\" as C_library_Invoice <<ADDED>> #D5F5E3"));
+	}
+
+	@Test
+	void rendersFocusedHierarchyFromSuperclassToSubclass() {
+		PlantUmlComparisonExporter.ChangeDiagramSet diagrams =
+			new PlantUmlComparisonExporter().exportChangeDiagrams(movedFeatureComparison());
+		String student = diagrams.diagrams().stream()
+			.filter(diagram -> diagram.fileName().equals("Student.puml"))
+			.findFirst().orElseThrow().source();
+
+		assertTrue(student.contains("title Ecore → Student (changed)"));
+		assertTrue(student.contains("C_library_User <|-[#16803A]-- C_library_Student"));
+	}
+
+	@Test
+	void writesLinkedPlantUmlAndSvgChangeDiagrams(@TempDir Path output) throws IOException {
+		new PlantUmlChangeDiagramExporter().write(customerComparison(), output);
+
+		assertTrue(Files.exists(output.resolve("main.puml")));
+		assertTrue(Files.exists(output.resolve("main.svg")));
+		assertTrue(Files.exists(output.resolve("Customer.puml")));
+		assertTrue(Files.exists(output.resolve("Customer.svg")));
+		assertTrue(Files.readString(output.resolve("main.svg")).contains("Customer.svg"));
+	}
+
+	@Test
+	void perClassChangeDiagramGenerationIsDisabledByDefault() throws ReflectiveOperationException {
+		Field option = App.class.getDeclaredField("GENERATE_PER_CLASS_CHANGE_DIAGRAMS");
+		option.setAccessible(true);
+
+		assertFalse(option.getBoolean(null));
+	}
+
+	@Test
+	void qualifiesCollidingDiagramNamesAndReservesMain() {
+		PlantUmlComparisonExporter.ChangeDiagramSet diagrams =
+			new PlantUmlComparisonExporter().exportChangeDiagrams(collidingClassNamesComparison());
+		List<String> filenames = diagrams.diagrams().stream()
+			.map(PlantUmlComparisonExporter.ChangeDiagram::fileName)
+			.toList();
+
+		assertTrue(filenames.contains("library_Customer.puml"));
+		assertTrue(filenames.contains("library_nested_Customer.puml"));
+		assertTrue(filenames.contains("library_main.puml"));
+		assertFalse(filenames.contains("Customer.puml"));
+		assertFalse(filenames.contains("main.puml"));
+	}
+
+	@Test
 	void rendersTheThesisRegressionFromRealEmfCompare() throws IOException {
 		Resource current = loadResource(
 			"/models/semantic-model-comparison/thesis-system2.ecore",
@@ -251,6 +326,24 @@ class PlantUmlComparisonExporterTest {
 			EcorePackage.Literals.ETYPED_ELEMENT__ETYPE, currency));
 		countryReferenceMatch.getDifferences().add(attributeChange(DifferenceKind.CHANGE,
 			EcorePackage.Literals.ETYPED_ELEMENT__LOWER_BOUND, 1));
+		return comparison;
+	}
+
+	private static Comparison collidingClassNamesComparison() {
+		EPackage library = ePackage("library");
+		EClass topLevelCustomer = addClass(library, "Customer");
+		EClass main = addClass(library, "main");
+		EPackage nested = ePackage("nested");
+		library.getESubpackages().add(nested);
+		EClass nestedCustomer = addClass(nested, "Customer");
+
+		Comparison comparison = COMPARE.createComparison();
+		for (EClass eClass : List.of(topLevelCustomer, nestedCustomer, main)) {
+			Match match = match(eClass, null);
+			match.getDifferences().add(referenceChange(DifferenceKind.ADD,
+				EcorePackage.Literals.EPACKAGE__ECLASSIFIERS, eClass));
+			comparison.getMatches().add(match);
+		}
 		return comparison;
 	}
 
