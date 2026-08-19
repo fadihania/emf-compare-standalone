@@ -115,6 +115,27 @@ class PlantUmlComparisonExporterTest {
 	}
 
 	@Test
+	void rendersExplicitClassRenameWithCurrentNameFirst() {
+		Comparison comparison = renamedClassComparison("Client", "Customer");
+
+		String plantUml = new PlantUmlComparisonExporter().export(comparison);
+
+		assertTrue(plantUml.contains("class \"<color:#8F5F00><b>Client (Customer)</b></color>\" "
+			+ "as C_library_Client <<CHANGED>> #FDF8E2"));
+		assertFalse(plantUml.contains("class \"Customer\" as C_library_Customer"));
+	}
+
+	@Test
+	void escapesRenamedClassNames() {
+		Comparison comparison = renamedClassComparison("Client & Core", "Customer <Legacy>");
+
+		String plantUml = new PlantUmlComparisonExporter().export(comparison);
+
+		assertTrue(plantUml.contains("<b>Client &amp; Core (Customer &lt;Legacy&gt;)</b>"));
+		assertTrue(plantUml.contains("as C_library_Client___Core <<CHANGED>>"));
+	}
+
+	@Test
 	void rendersTheThesisRegressionFromRealEmfCompare() throws IOException {
 		Resource current = loadResource(
 			"/models/semantic-model-comparison/thesis-system2.ecore",
@@ -270,6 +291,24 @@ class PlantUmlComparisonExporterTest {
 			EcorePackage.Literals.ECLASS__ESTRUCTURAL_FEATURES, oldLegacy));
 		studentMatch.getDifferences().add(referenceChange(DifferenceKind.ADD,
 			EcorePackage.Literals.ECLASS__ESUPER_TYPES, currentUser));
+		return comparison;
+	}
+
+	private static Comparison renamedClassComparison(String currentName, String oldName) {
+		EPackage currentPackage = ePackage("library");
+		EPackage oldPackage = ePackage("library");
+		EClass currentClass = addClass(currentPackage, currentName);
+		EClass oldClass = addClass(oldPackage, oldName);
+		addAttribute(currentClass, "id", EcorePackage.Literals.ESTRING);
+		addAttribute(oldClass, "id", EcorePackage.Literals.ESTRING);
+
+		Comparison comparison = COMPARE.createComparison();
+		Match packageMatch = match(currentPackage, oldPackage);
+		Match classMatch = match(currentClass, oldClass);
+		comparison.getMatches().add(packageMatch);
+		packageMatch.getSubmatches().add(classMatch);
+		classMatch.getDifferences().add(attributeChange(DifferenceKind.CHANGE,
+			EcorePackage.Literals.ENAMED_ELEMENT__NAME, currentName));
 		return comparison;
 	}
 

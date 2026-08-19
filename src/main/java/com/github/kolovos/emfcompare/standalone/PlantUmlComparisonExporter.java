@@ -82,6 +82,7 @@ public final class PlantUmlComparisonExporter {
 		private EClass old;
 		private Kind identityKind = Kind.NONE;
 		private boolean affected;
+		private boolean renamed;
 		private String alias;
 
 		private EClass displayed() {
@@ -231,6 +232,11 @@ public final class PlantUmlComparisonExporter {
 				ClassView view = classFor(match);
 				if (view != null && view.current != null && view.old != null) {
 					view.affected = true;
+					if (diff instanceof AttributeChange change
+							&& diff.getKind() == DifferenceKind.CHANGE
+							&& sameFeature(change.getAttribute(), EcorePackage.Literals.ENAMED_ELEMENT__NAME)) {
+						view.renamed = true;
+					}
 				}
 			}
 		}
@@ -414,6 +420,7 @@ public final class PlantUmlComparisonExporter {
 
 		private String classLabel(ClassView view) {
 			EClass displayed = view.displayed();
+			String name = classNameLabel(view);
 			Map<ClassView, Kind> diffKinds = new IdentityHashMap<>();
 			inheritanceDiffs.stream()
 				.filter(diff -> diff.subclass() == view)
@@ -427,14 +434,25 @@ public final class PlantUmlComparisonExporter {
 			}
 			superclasses.addAll(diffKinds.keySet());
 			if (superclasses.isEmpty()) {
-				return escapeQuoted(nameOf(displayed));
+				return name;
 			}
 
 			String details = superclasses.stream()
 				.sorted(Comparator.comparing(PlantUmlComparisonExporter::classSortKey))
 				.map(superclass -> renderSuperclassName(superclass, diffKinds.getOrDefault(superclass, Kind.NONE)))
 				.collect(Collectors.joining(", "));
-			return escapeQuoted(nameOf(displayed)) + ":\\n" + details;
+			return name + ":\\n" + details;
+		}
+
+		private String classNameLabel(ClassView view) {
+			EClass displayed = view.displayed();
+			if (!view.renamed || view.current == null || view.old == null) {
+				return escapeMarkup(escapeQuoted(nameOf(displayed)));
+			}
+			String currentName = escapeMarkup(escapeQuoted(nameOf(view.current)));
+			String oldName = escapeMarkup(escapeQuoted(nameOf(view.old)));
+			return "<color:" + CHANGED_TEXT + "><b>" + currentName + " (" + oldName
+				+ ")</b></color>";
 		}
 
 		private String renderSuperclassName(ClassView superclass, Kind kind) {
